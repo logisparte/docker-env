@@ -1,0 +1,28 @@
+﻿name: ci-branch
+
+on:
+  pull_request:
+    branches:
+      - master
+
+env:
+  DOCKER_BUILDKIT: true
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+
+      - name: Initialize development environment
+        run: ./docker/env.sh init
+
+      - name: Start development environment
+        run: ./docker/env.sh up
+
+      - name: Lint project
+        run: ./docker/env.sh exec ./scripts/lint.sh all
+
+      - name: Stop development environment
+        run: ./docker/env.sh down

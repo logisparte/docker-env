@@ -1,0 +1,51 @@
+rules:
+  body-leading-blank:
+    - 1
+    - always
+  body-max-line-length:
+    - 2
+    - always
+    - 96
+  footer-leading-blank:
+    - 1
+    - always
+  footer-max-line-length:
+    - 2
+    - always
+    - 96
+  header-max-length:
+    - 2
+    - always
+    - 72 # github hides text beyond this length behind an ellipsis
+  subject-case:
+    - 2
+    - always
+    - - lower-case
+      - kebab-case
+      - snake-case
+  subject-empty:
+    - 2
+    - never
+  subject-full-stop:
+    - 2
+    - never
+    - .
+  type-empty:
+    - 2
+    - never
+
+  # Semver commit type convention
+  #
+  # M (MAJOR)             => Incompatible change
+  # m (MINOR)             => Backward compatible feature
+  # p (PATCH)             => Backward compatible bug fix
+  # r (REVISION/REFACTOR) => Backward compatible improvement
+  # x (MISCELLANEOUS)     => Neutral change (documentation, ci/cd, dev dependencies, etc.)
+  type-enum:
+    - 2
+    - always
+    - - M
+      - m
+      - p
+      - r
+      - x
