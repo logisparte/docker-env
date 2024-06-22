@@ -7,6 +7,7 @@ on:
 
 env:
   DOCKER_BUILDKIT: true
+  DOCKER_ENV_REGISTRY: ghcr.io/logisparte
 
 jobs:
   check-branch:
@@ -15,14 +16,21 @@ jobs:
       - name: Clone project
         uses: actions/checkout@v4
 
-      - name: Initialize development environment
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_ENV_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Initialize docker env
         run: ./docker/env.sh init
 
-      - name: Start development environment
+      - name: Start docker env
         run: ./docker/env.sh up
 
       - name: Lint project
         run: ./docker/env.sh exec ./scripts/lint.sh all
 
-      - name: Stop development environment
+      - name: Stop docker env
         run: ./docker/env.sh down

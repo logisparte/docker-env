@@ -1,0 +1,36 @@
+name: ci-master
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  DOCKER_BUILDKIT: true
+  DOCKER_ENV_REGISTRY: ghcr.io/logisparte
+
+permissions:
+  packages: write # Required to push docker image to registry
+
+jobs:
+  update-dev-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_ENV_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build new dev image
+        run: ./docker/env.sh build
+
+      - name: Tag new dev image
+        run: |
+          ./docker/env.sh tag ${{ github.sha }}
+          ./docker/env.sh push ${{ github.sha }}
+          ./docker/env.sh push

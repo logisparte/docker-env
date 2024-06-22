@@ -15,8 +15,11 @@
 # limitations under the License.
 #
 
-COMPOSE_PROJECT_NAME="$(basename "$PWD")"
-export COMPOSE_PROJECT_NAME
+PROJECT_NAME="$(basename "$PWD")"
+export IMAGE_NAME="$PROJECT_NAME-dev"
+if [ -n "$DOCKER_ENV_REGISTRY" ]; then
+  export IMAGE_NAME="$DOCKER_ENV_REGISTRY/$IMAGE_NAME"
+fi
 
 PROJECT_DOCKER_DIRECTORY="$PWD/docker"
 PROJECT_COMPOSE_FILE="$PROJECT_DOCKER_DIRECTORY/compose.yaml"
@@ -31,16 +34,20 @@ USER_HOST_SUDOER_FILE="$USER_HOST_DIRECTORY/sudoer"
 _help() {
   {
     echo
-    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo "Usage: $0 COMMAND [OPTIONS] [ARGS...]"
     echo
-    echo "Manage the local dev env container"
+    echo "Encapsulate your project's development environment inside a Docker container"
     echo
     echo "Commands:"
-    echo "  init|Prepare user host files and build dev env image"
-    echo "  up|Create and start a persistent dev env container"
-    echo "  down|Stop and remove the dev env container"
-    echo "  exec|Execute a command in the running dev env container"
-    echo "  shell|Open an interactive shell in the running dev env container"
+    echo "  init|Prepare user host files and build dev image"
+    echo "  build|Build dev image"
+    echo "  up|Create and start a persistent dev container"
+    echo "  down|Stop and remove the dev container"
+    echo "  exec|Execute a command in the running dev container"
+    echo "  shell|Open an interactive shell in the running dev container"
+    echo "  tag [TAG]|Tag the dev image"
+    echo "  pull [TAG]|Pull the dev image from the \$DOCKER_ENV_REGISTRY"
+    echo "  push [TAG]|Push the dev image to the \$DOCKER_ENV_REGISTRY"
     echo
     echo "init options:"
     echo "  -f, --force|Recreate user host files, even if they already exist"
@@ -57,6 +64,7 @@ _compose() {
   fi
 
   docker compose \
+    --project-name "$PROJECT_NAME" \
     --env-file "$USER_HOST_COMPOSE_ENV_FILE" \
     --file "$PROJECT_COMPOSE_FILE" \
       "$@"
@@ -164,8 +172,11 @@ case "$COMMAND" in
   init)
     shift
     _init "$@"
-    _compose pull --ignore-buildable
-    _compose build
+    _compose build --pull dev
+    ;;
+
+  build)
+    _compose build --pull dev
     ;;
 
   up)
@@ -178,11 +189,39 @@ case "$COMMAND" in
 
   exec)
     shift
-    _compose exec dev-env "$@"
+    _compose exec dev "$@"
     ;;
 
   shell)
-    _compose exec dev-env "${SHELL:-/bin/sh}" --login
+    _compose exec dev "${SHELL:-/bin/sh}" --login
+    ;;
+
+  tag)
+    shift
+    TAG="${1:-latest}"
+    docker image tag "$IMAGE_NAME" "$IMAGE_NAME:$TAG"
+    ;;
+
+  pull)
+    if [ -z "$DOCKER_ENV_REGISTRY" ]; then
+      echo "docker-env: 'DOCKER_ENV_REGISTRY' is not set, cannot proceed with pull." >&2
+      exit 1
+    fi
+
+    shift
+    TAG="${1:-latest}"
+    docker image pull "$IMAGE_NAME:$TAG"
+    ;;
+
+  push)
+    if [ -z "$DOCKER_ENV_REGISTRY" ]; then
+      echo "docker-env: 'DOCKER_ENV_REGISTRY' is not set, cannot proceed with push." >&2
+      exit 1
+    fi
+
+    shift
+    TAG="${1:-latest}"
+    docker image push "$IMAGE_NAME:$TAG"
     ;;
 
   *)

@@ -1,6 +1,6 @@
 # docker-env
 
-Containerized development environments
+Encapsulate your project's development environment inside a Docker container
 
 ## License
 

@@ -15,17 +15,13 @@
 #
 
 services:
-  dev-env:
-    labels:
-      org.opencontainers.image.title: $COMPOSE_PROJECT_NAME-dev-env
-      org.opencontainers.image.description:
-        Development environment image of $COMPOSE_PROJECT_NAME
-    image: $COMPOSE_PROJECT_NAME-dev-env
+  dev:
+    image: $IMAGE_NAME
     build:
       context: $PWD
       dockerfile: $PWD/docker/Dockerfile
     environment:
-      DOCKER_ENV_CURRENT: $COMPOSE_PROJECT_NAME
+      DOCKER_ENV_CURRENT: $IMAGE_NAME
       SSH_AUTH_SOCK: $HOST_SSH_AUTH_SOCK
       TERM:
       CI:

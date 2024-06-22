@@ -1,0 +1,10 @@
+services:
+  dev:
+    volumes:
+      - $HOME/.zshenv:$HOME/.zshenv
+      - $HOME/.zsh:$HOME/.zsh
+      - $HOME/.vim:$HOME/.vim
+      - $HOME/.vimrc:$HOME/.vimrc
+      - $HOME/.gitconfig:$HOME/.gitconfig
+      - $HOME/.gitignore_global:$HOME/.gitignore_global
+      - $HOME/.ssh:$HOME/.ssh
