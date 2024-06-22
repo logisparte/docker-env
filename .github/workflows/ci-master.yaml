@@ -26,8 +26,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build new dev image
-        run: ./docker/env.sh build
+      - name: Initialize docker env
+        run: ./docker/env.sh init
 
       - name: Tag new dev image
         run: |
