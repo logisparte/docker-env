@@ -38,7 +38,7 @@ FILES="$({
   done
 })"
 
-PRETTIER_FILES="$(echo "$FILES" | grep -e "\.md$" -e "\.yml$" -e "\.yaml$" || true)"
+PRETTIER_FILES="$(echo "$FILES" | grep -e "\.md$" -e "\.yaml$" || true)"
 if [ -n "$PRETTIER_FILES" ]; then
   report --info "Markdown and yaml files >>"
   echo "$PRETTIER_FILES" | xargs prettier --write

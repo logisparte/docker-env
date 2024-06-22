@@ -1,8 +1,11 @@
 # syntax=docker/dockerfile:1
 FROM ubuntu:24.04 AS base
 
-LABEL org.opencontainers.image.authors="@logisparte"
-LABEL org.opencontainers.image.source="https://github.com/logisparte/docker-env"
+LABEL org.opencontainers.image.title="docker-env-dev" \
+  org.opencontainers.image.description="Dev image of docker-env" \
+  org.opencontainers.image.authors="@logisparte" \
+  org.opencontainers.image.source="https://github.com/logisparte/docker-env" \
+  org.opencontainers.image.licenses="Apache-2.0"
 
 RUN <<EOF
   DEBIAN_FRONTEND=noninteractive \
