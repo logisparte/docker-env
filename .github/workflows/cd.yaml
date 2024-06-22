@@ -27,7 +27,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Pull dev image
-        run: ./docker/env.sh pull ${{ github.sha }}
+        run: ./docker/env.sh pull
 
       - name: Tag dev image with version
         run: |
