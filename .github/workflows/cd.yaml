@@ -7,7 +7,7 @@ on:
 
 env:
   DOCKER_BUILDKIT: true
-  DOCKER_ENV_REGISTRY: ghcr.io/logisparte
+  DOCKER_ENV_REGISTRY: ${{ vars.DOCKER_ENV_REGISTRY }}
 
 permissions:
   packages: write # Required to push docker image to registry
