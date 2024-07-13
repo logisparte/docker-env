@@ -143,6 +143,9 @@ _entrypoint() {
     DIRECTORY="$(dirname "$DIRECTORY")"
   done
 
+  # Rationalize ownership of SSH socket
+  sudo chown "$USERNAME" "$SSH_AUTH_SOCK"
+
   # Exec provided command or pause to keep container alive
   if [ $# -gt 0 ]; then
     "$@"
