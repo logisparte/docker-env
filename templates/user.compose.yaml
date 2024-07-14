@@ -1,5 +1,7 @@
 services:
   dev:
+    environment:
+      # Configure your personal environment variables here
     volumes:
       - $HOME/.zshenv:$HOME/.zshenv
       - $HOME/.zsh:$HOME/.zsh
@@ -8,3 +10,4 @@ services:
       - $HOME/.gitconfig:$HOME/.gitconfig
       - $HOME/.gitignore_global:$HOME/.gitignore_global
       - $HOME/.ssh:$HOME/.ssh
+      # Mount your personal configurations here

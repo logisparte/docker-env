@@ -4,8 +4,7 @@ FROM ubuntu:24.04 AS base
 LABEL org.opencontainers.image.title="<BAR>-dev" \
   org.opencontainers.image.description="Development environment image of <BAR>" \
   org.opencontainers.image.authors="@<FOO>" \
-  org.opencontainers.image.source="https://github.com/<FOO>/<BAR>" \
-  org.opencontainers.image.licenses="Apache-2.0"
+  org.opencontainers.image.source="https://github.com/<FOO>/<BAR>"
 
 RUN <<EOF
   DEBIAN_FRONTEND=noninteractive \

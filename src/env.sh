@@ -1,5 +1,7 @@
 #!/bin/sh -e
 #
+# docker-env 0.1.2
+#
 # Copyright 2024 logisparte inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
