@@ -1,8 +1,8 @@
 #!/bin/sh -e
 #
-# docker-env 0.1.3
+# docker-env 0.2.0
 #
-# Copyright 2024 logisparte inc.
+# Copyright 2025 logisparte inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,12 @@
 # limitations under the License.
 #
 
+if [ -f "$PWD/.env" ]; then
+  set -a
+  . "$PWD/.env"
+  set +a
+fi
+
 PROJECT_NAME="$(basename "$PWD")"
 export IMAGE_NAME="$PROJECT_NAME-dev"
 if [ -n "$DOCKER_ENV_REGISTRY" ]; then
@@ -25,6 +31,7 @@ fi
 
 PROJECT_DOCKER_DIRECTORY="$PWD/docker"
 PROJECT_COMPOSE_FILE="$PROJECT_DOCKER_DIRECTORY/compose.yaml"
+PROJECT_DOCKERFILE="$PROJECT_DOCKER_DIRECTORY/Dockerfile"
 USER_DIRECTORY="$HOME/.config/docker-env"
 USER_COMPOSE_FILE="$USER_DIRECTORY/compose.yaml"
 USER_HOST_DIRECTORY="$USER_DIRECTORY/host"
@@ -32,6 +39,8 @@ USER_HOST_COMPOSE_ENV_FILE="$USER_HOST_DIRECTORY/.env"
 USER_HOST_PASSWD_FILE="$USER_HOST_DIRECTORY/passwd"
 USER_HOST_GROUP_FILE="$USER_HOST_DIRECTORY/group"
 USER_HOST_SUDOER_FILE="$USER_HOST_DIRECTORY/sudoer"
+
+export COMPOSE_BAKE=true
 
 _help() {
   {
@@ -47,9 +56,9 @@ _help() {
     echo "  down|Stop and remove the dev container"
     echo "  exec|Execute a command in the running dev container"
     echo "  shell|Open an interactive shell in the running dev container"
-    echo "  tag [TAG]|Tag the dev image"
-    echo "  pull [TAG]|Pull the dev image from the \$DOCKER_ENV_REGISTRY"
-    echo "  push [TAG]|Push the dev image to the \$DOCKER_ENV_REGISTRY"
+    echo "  tag [NEW_TAG=latest] [CURRENT_TAG=]|Tag the dev image"
+    echo "  pull [TAG=latest]|Pull the dev image from the \$DOCKER_ENV_REGISTRY"
+    echo "  push [TAG=latest]|Push the dev image to the \$DOCKER_ENV_REGISTRY"
     echo
     echo "init options:"
     echo "  -f, --force|Recreate user host files, even if they already exist"
@@ -69,7 +78,7 @@ _compose() {
     --project-name "$PROJECT_NAME" \
     --env-file "$USER_HOST_COMPOSE_ENV_FILE" \
     --file "$PROJECT_COMPOSE_FILE" \
-      "$@"
+    "$@"
 }
 
 # Prepare host files to map host user into container
@@ -133,6 +142,17 @@ _init() {
   } > "$USER_HOST_COMPOSE_ENV_FILE"
 }
 
+# Build the image from cache, if possible
+_build() {
+  docker image build \
+    --file "$PROJECT_DOCKERFILE" \
+    --tag "$IMAGE_NAME" \
+    --cache-from "type=registry,ref=$IMAGE_NAME" \
+    --cache-to type=inline \
+    --pull \
+    .
+}
+
 # Container entrypoint (used inside container)
 _entrypoint() {
   USERNAME="$(id -un)"
@@ -150,7 +170,7 @@ _entrypoint() {
     sudo chown "$USERNAME" "$SSH_AUTH_SOCK"
   fi
 
-  # Exec provided command or pause to keep container alive
+  # Exec provided one-off command or pause to keep container alive
   if [ $# -gt 0 ]; then
     "$@"
 
@@ -179,11 +199,11 @@ case "$COMMAND" in
   init)
     shift
     _init "$@"
-    _compose build --pull dev
+    _build
     ;;
 
   build)
-    _compose build --pull dev
+    _build
     ;;
 
   up)
@@ -205,8 +225,14 @@ case "$COMMAND" in
 
   tag)
     shift
-    TAG="${1:-latest}"
-    docker image tag "$IMAGE_NAME" "$IMAGE_NAME:$TAG"
+    NEW_TAG="${1:-latest}"
+    if [ $# -gt 1 ]; then
+      CURRENT_IMAGE_NAME="$IMAGE_NAME:$2"
+    else
+      CURRENT_IMAGE_NAME="$IMAGE_NAME"
+    fi
+
+    docker image tag "$CURRENT_IMAGE_NAME" "$IMAGE_NAME:$NEW_TAG"
     ;;
 
   pull)

@@ -19,9 +19,9 @@
 services:
   dev:
     image: $IMAGE_NAME
-    build:
-      context: $PWD
-      dockerfile: $PWD/docker/Dockerfile
+    env_file:
+      - path: $PWD/.env
+        required: false
     environment:
       DOCKER_ENV_CURRENT: $IMAGE_NAME
       SSH_AUTH_SOCK: $HOST_SSH_AUTH_SOCK
