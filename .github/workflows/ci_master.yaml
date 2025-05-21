@@ -36,7 +36,8 @@ jobs:
         run: |
           IMAGE_NAME="$(./docker/env.sh name)"
           ./docker/env.sh build \
-            --platform linux/arm64,linux/amd64 \
+            --platform linux/arm64 \
+            --platform linux/amd64 \
             --tag "$IMAGE_NAME:latest" \
             --tag "$IMAGE_NAME:${{ github.sha }}" \
             --push
