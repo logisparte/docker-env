@@ -63,7 +63,7 @@ _help() {
     echo
     echo \
       "For more help on how to use docker-env, head to https://github.com/logisparte/docker-env"
-  } | awk -F "|" '{printf "%-18s %s\n", $1, $2}'
+  } | awk -F "|" '{printf "%-40s %s\n", $1, $2}'
 }
 
 # To use docker compose with project's compose file, host files and optional user customizations
