@@ -32,9 +32,6 @@ jobs:
       - name: Spin up docker-env
         run: ./docker/env.sh up
 
-      - name: Setup project
-        run: ./docker/env.sh exec ./scripts/setup.sh
-
       - name: Lint project
         run: ./docker/env.sh exec ./scripts/lint.sh
 
