@@ -27,7 +27,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64,linux/amd64
 
       - name: Clone project
         uses: actions/checkout@v4
@@ -35,6 +35,8 @@ jobs:
       - name: Build, tag and push docker env
         run: |
           ./docker/env.sh build \
-            --platform linux/amd64,linux/arm64 \
-            --tag latest,${{ github.sha }} \
+            --platform linux/arm64 \
+            --platform linux/amd64 \
+            --tag latest \
+            --tag ${{ github.sha }} \
             --push
