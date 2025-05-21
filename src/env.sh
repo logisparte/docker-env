@@ -45,11 +45,12 @@ export COMPOSE_BAKE=true
 _help() {
   {
     echo
-    echo "Usage: $0 COMMAND [OPTIONS] [ARGS...]"
+    echo "Usage: ./docker/env.sh COMMAND [OPTIONS] [ARGS...]"
     echo
     echo "Encapsulate your project's development environment inside a Docker container"
     echo
     echo "Commands:"
+    echo "  name|Output the dev image name"
     echo "  init [OPTIONS]|Prepare user host files and build dev image"
     echo "  build [OPTIONS]|Build dev image"
     echo "  clean [OPTIONS]|Delete user host files and dev image"
@@ -193,6 +194,10 @@ fi
 case "$COMMAND" in
   -h | --help)
     _help
+    ;;
+
+  name)
+    echo "$IMAGE_NAME"
     ;;
 
   init)

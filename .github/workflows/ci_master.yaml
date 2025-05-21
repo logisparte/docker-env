@@ -34,9 +34,10 @@ jobs:
 
       - name: Build, tag and push docker env
         run: |
+          IMAGE_NAME="$(./docker/env.sh name)"
           ./docker/env.sh build \
             --platform linux/arm64 \
             --platform linux/amd64 \
-            --tag latest \
-            --tag ${{ github.sha }} \
+            --tag "$IMAGE_NAME:latest" \
+            --tag "$IMAGE_NAME:${{ github.sha }}" \
             --push
