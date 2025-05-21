@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize docker env
-        run: ./docker/env.sh init --platform linux/amd64,linux/arm64
+        run: ./docker/env.sh init --platform linux/amd64,linux/arm64 --load
 
       - name: Tag latest dev image
         run: |
