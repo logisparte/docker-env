@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# docker-env 0.2.0
+# docker-env 0.3.0
 #
 # Copyright 2025 logisparte inc.
 #
@@ -50,8 +50,9 @@ _help() {
     echo "Encapsulate your project's development environment inside a Docker container"
     echo
     echo "Commands:"
-    echo "  init|Prepare user host files and build dev image"
-    echo "  build|Build dev image"
+    echo "  init [OPTIONS]|Prepare user host files and build dev image"
+    echo "  build [OPTIONS]|Build dev image"
+    echo "  clean [OPTIONS]|Delete user host files and dev image"
     echo "  up|Create and start a persistent dev container"
     echo "  down|Stop and remove the dev container"
     echo "  exec|Execute a command in the running dev container"
@@ -59,9 +60,6 @@ _help() {
     echo "  tag [NEW_TAG=latest] [CURRENT_TAG=]|Tag the dev image"
     echo "  pull [TAG=latest]|Pull the dev image from the \$DOCKER_ENV_REGISTRY"
     echo "  push [TAG=latest]|Push the dev image to the \$DOCKER_ENV_REGISTRY"
-    echo
-    echo "init options:"
-    echo "  -f, --force|Recreate user host files, even if they already exist"
     echo
     echo \
       "For more help on how to use docker-env, head to https://github.com/logisparte/docker-env"
@@ -83,16 +81,10 @@ _compose() {
 
 # Prepare host files to map host user into container
 _init() {
-  OPTION="$1"
-  case "$OPTION" in
-    -f | --force)
-      true
-      ;;
-
-    *)
-      [ -d "$USER_HOST_DIRECTORY" ] && return 0
-      ;;
-  esac
+  if [ -d "$USER_HOST_DIRECTORY" ]; then
+    echo "docker-env: User host files already exist at $USER_HOST_DIRECTORY, skipping."
+    return 0
+  fi
 
   # Clear docker host directory
   rm -rf "$USER_HOST_DIRECTORY"
@@ -150,7 +142,14 @@ _build() {
     --cache-from "type=registry,ref=$IMAGE_NAME" \
     --cache-to type=inline \
     --pull \
+    "$@" \
     .
+}
+
+# Delete host files and image
+_clean() {
+  rm -rf "$USER_HOST_DIRECTORY"
+  docker image remove "$IMAGE_NAME" "$@"
 }
 
 # Container entrypoint (used inside container)
@@ -198,12 +197,18 @@ case "$COMMAND" in
 
   init)
     shift
-    _init "$@"
-    _build
+    _init
+    _build "$@"
+    ;;
+
+  clean)
+    shift
+    _clean "$@"
     ;;
 
   build)
-    _build
+    shift
+    _build "$@"
     ;;
 
   up)
