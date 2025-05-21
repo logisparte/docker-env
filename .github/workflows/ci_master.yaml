@@ -16,18 +16,18 @@ jobs:
   cache_dev_image:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up multiarch docker builder
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          platforms: linux/arm64,linux/amd64
+
       - name: Login to registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_ENV_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ github.token }}
-
-      - name: Set up multiarch docker builder
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-          platforms: linux/arm64,linux/amd64
 
       - name: Clone project
         uses: actions/checkout@v4
