@@ -256,20 +256,30 @@ case "$COMMAND" in
 
   exec)
     shift
-    if [ "$1" != "--" ]; then
-      SERVICE="$1"
-      shift
+    case "$1" in
+      "")
+        echo "docker-env: Missing exec arguments" >&2
+        echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
+        exit 1
+        ;;
 
-    else
-      SERVICE="$PROJECT_DEFAULT_SERVICE"
-    fi
+      "--")
+        SERVICE="$PROJECT_DEFAULT_SERVICE"
+        shift
+        ;;
 
-    if [ "$1" != "--" ]; then
-      echo "docker-env: Missing command separator '--'" >&2
-      exit 1
-    fi
+      *)
+        SERVICE="$1"
+        shift
+        if [ "$1" != "--" ]; then
+          echo "docker-env: Missing service/command separator '--'" >&2
+          echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
+          exit 1
+        fi
+        shift
+        ;;
+    esac
 
-    shift
     _is_up || _up
     _compose exec "$SERVICE" "$@"
     ;;
