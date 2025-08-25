@@ -41,6 +41,7 @@ PROJECT_COMPOSE_FILE="${DOCKER_ENV_PROJECT_COMPOSE_FILE:-"$PROJECT_DOCKER_DIRECT
 PROJECT_CACHE_DIRECTORY="${DOCKER_ENV_PROJECT_CACHE_DIRECTORY:-$PWD/.cache/docker-env}"
 PROJECT_BASE_COMPOSE_FILE="$PROJECT_CACHE_DIRECTORY/base.compose.yaml"
 PROJECT_DEFAULT_SERVICE="${DOCKER_ENV_PROJECT_DEFAULT_SERVICE:-"dev"}"
+BUILD_PLATFORMS="${DOCKER_ENV_BUILD_PLATFORMS:-}"
 
 _help() {
   {
@@ -147,8 +148,17 @@ services:
       - \$PWD:\$PWD
     working_dir: \$PWD
     entrypoint: ["$PROJECT_DOCKER_DIRECTORY/env.sh", "_entrypoint"]
-
 EOF
+
+  if [ -n "$BUILD_PLATFORMS" ]; then
+    echo "    platforms:" >> "$PROJECT_BASE_COMPOSE_FILE"
+    ORIGINAL_IFS="$IFS"
+    IFS=','
+    for PLATFORM in $BUILD_PLATFORMS; do
+      echo "      - $PLATFORM" >> "$PROJECT_BASE_COMPOSE_FILE"
+    done
+    IFS="$ORIGINAL_IFS"
+  fi
 
   for DOCKERFILE in "$PROJECT_DOCKER_DIRECTORY"/*Dockerfile; do
     if [ ! -f "$DOCKERFILE" ]; then
@@ -164,6 +174,7 @@ EOF
 
     IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${_SERVICE:+-${_SERVICE}}-env"
     cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
+
   ${_SERVICE:-$PROJECT_DEFAULT_SERVICE}:
     extends:
       service: docker-env
@@ -177,7 +188,6 @@ EOF
         - type=inline
       tags:
         - $IMAGE:${DOCKER_ENV_PUSH_TAG:-latest}
-
 EOF
   done
 }
@@ -304,6 +314,11 @@ else
     init)
       shift
       _init "$@"
+      ;;
+
+    build)
+      shift
+      _compose build "$@"
       ;;
 
     compose)

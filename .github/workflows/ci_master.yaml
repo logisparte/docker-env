@@ -17,12 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKER_ENV_PUSH_TAG: ${{ github.sha }}
+      DOCKER_ENV_BUILD_PLATFORMS: linux/arm64,linux/amd64
     steps:
       - name: Set up multiarch docker builder
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-          platforms: linux/arm64,linux/amd64
+          platforms: $DOCKER_ENV_BUILD_PLATFORMS
 
       - name: Login to registry
         uses: docker/login-action@v3
@@ -38,4 +39,4 @@ jobs:
         run: ./docker/env.sh init
 
       - name: Build, tag and push docker env
-        run: ./docker/env.sh compose build --push
+        run: ./docker/env.sh build --push
