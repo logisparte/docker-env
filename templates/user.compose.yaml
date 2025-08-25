@@ -1,5 +1,5 @@
 services:
-  dev:
+  user:
     environment:
       # Configure your personal environment variables here
     volumes:

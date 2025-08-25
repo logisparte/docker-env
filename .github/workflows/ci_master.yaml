@@ -11,13 +11,12 @@ permissions:
 
 env:
   DOCKER_ENV_REGISTRY: ${{ vars.DOCKER_ENV_REGISTRY }}
+  DOCKER_ENV_PUSH_TAG: ${{ github.sha }}
+  DOCKER_ENV_BUILD_PLATFORMS: linux/arm64,linux/amd64
 
 jobs:
   cache_dev_image:
     runs-on: ubuntu-latest
-    env:
-      DOCKER_ENV_PUSH_TAG: ${{ github.sha }}
-      DOCKER_ENV_BUILD_PLATFORMS: linux/arm64,linux/amd64
     steps:
       - name: Set up multiarch docker builder
         uses: docker/setup-buildx-action@v3

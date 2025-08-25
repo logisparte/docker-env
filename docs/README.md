@@ -24,7 +24,54 @@ Installation in a project is a short manual process, detailed as follows:
 Now you're ready to start using `docker-env` in your project. Run `./docker/env.sh --help` for
 more information on general usage.
 
+### Multiple environments
+
+You can also use multiple environment images, each with their own Dockerfiles. To do so, simply
+prefix each Dockerfile with the corresponding service name, example:
+
+Instead of simply:
+
+`./docker/Dockerfile` -> `dev` service in your project's compose.yaml file
+
+Do:
+
+`./docker/server.Dockerfile` -> `server` service in your project's compose.yaml file
+`./docker/app.Dockerfile` -> `app` service in your project's compose.yaml file
+
+### Environment variables
+
+You can customize the following environment variables:
+
+<!-- markdownlint-disable MD013 -->
+
+| var                                   | default                                             | description                                                      |
+| ------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| `DOCKER_ENV_PROJECT_NAME`             | Repository name                                     | Name of your project (used to generated images and containers)   |
+| `DOCKER_ENV_PROJECT_DOCKER_DIRECTORY` | `$PWD/docker`                                       | Project directory                                                |
+| `DOCKER_ENV_PROJECT_COMPOSE_FILE`     | `$DOCKER_ENV_PROJECT_DOCKER_DIRECTORY/compose.yaml` | The dev env compose file, where services are defined             |
+| `DOCKER_ENV_PROJECT_CACHE_DIRECTORY`  | `$PWD/.cache/docker-env`                            | Where docker-env will store its generated files for your project |
+| `DOCKER_ENV_PROJECT_DEFAULT_SERVICE`  | dev                                                 | Default dev env service to use when unspecified                  |
+| `DOCKER_ENV_BUILD_PLATFORMS`          | -                                                   | Target platforms when building images                            |
+| `DOCKER_ENV_REGISTRY`                 | -                                                   | Registry where built images will be pulled/pushed from/to        |
+| `DOCKER_ENV_PULL_TAG`                 | latest                                              | Image tag to pull from registry                                  |
+| `DOCKER_ENV_PUSH_TAG`                 | latest                                              | Tag built images with value before pushing to registry           |
+
+These variables are readonly:
+
+| var                                    | value                                                   | description                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `DOCKER_ENV`                           | true                                                    | Only available inside a dev env container                                                                              |
+| `DOCKER_ENV_NAME`                      | Name of the current service                             | Only available when running an interactive shell inside a dev env container                                            |
+| `DOCKER_ENV_PROJECT_BASE_COMPOSE_FILE` | `$DOCKER_ENV_PROJECT_CACHE_DIRECTORY/base.compose.yaml` | Generated base compose file that **must** be extended by your dev-env service(s) in `$DOCKER_ENV_PROJECT_COMPOSE_FILE` |
+
+<!-- markdownlint-enable MD013 -->
+
 ### Recommendations
+
+### Add .cache directory to .gitignore
+
+`docker-env` stores a generated base compose.yaml file for your project in `.cache/docker-env`.
+This file should not be commited as it may contain user-specific paths.
 
 #### Alias
 
@@ -46,39 +93,35 @@ export DOCKER_ENV_REGISTRY="ghcr.io/<FOO>" # or any other container registry
 
 #### Local development
 
-Assuming your Docker daemon is running:
+Assuming your Docker daemon is running, just run `./docker/env.sh shell` to build/pull images,
+create containers, start them and open an interactive shell in the dev env container.
 
-1. `./docker/env.sh init` To pull and/or build the image and create host files.
-2. `./docker/env.sh up` To create and start a dev container.
-3. `./docker/env.sh shell` To open a shell inside the running dev container.
-4. Develop (optionally, attach your editor/IDE to the running dev container).
-5. `exit` to close the shell and return to the host computer.
-6. `./docker/env.sh down` To stop and remove the running dev container.
+> Again, customizing the `$HOME/.config/docker-env/compose.yaml` file will allow you to mount
+> your personal configurations in the container for a more familiar environment.
 
-> Again, using a `$HOME/.config/docker-env/compose.yaml` file will allow you to mount your
->  personal configurations in the container for a more familiar environment.
+#### CI workflows
 
-#### CI/CD
+You can use `./docker/env.sh exec -- COMMAND` to build/pull images, create containers, start
+them and execute a command in the dev env container. The `init` and `build` subcommands,
+alongside some [environment variables](#environment-variables) can also be used to
+build/pull/push/tag dev env images.
 
-1. `./docker/env.sh init` To pull and/or build the image and host files.
-2. `./docker/env.sh up` To create and start a dev container.
-3. `./docker/env.sh exec COMMAND` To run a command inside the dev container (like running
-   tests).
-4. `./docker/env.sh down` To stop and remove the running dev container.
+> You can look at this repo's CI/CD workflows for inspiration
 
-> You can also use the `tag`, `push` and `pull` subcommands to manage your dev image registry
->  versioning.
+#### Winding down
+
+When done, you can stop and remove the environment using `./docker/env.sh down`
 
 ## Contributors
 
 ```shell
 git clone git@github.com:logisparte/docker-env.git
 cd docker-env
-git config --local core.hooksPath "$PWD/hooks"
+./scripts/setup.sh # install git hooks
 ```
 
 > The git hooks will format and lint code before commit, and the git messages will be linted
->  using `commitlint`.
+> using `commitlint`.
 
 ### Environment
 
@@ -99,12 +142,6 @@ format dirty files:
 ./scripts/format.sh
 ```
 
-To format all files:
-
-```shell
-./scripts/format.sh all
-```
-
 #### Lint
 
 [ShellCheck](https://github.com/koalaman/shellcheck) is used to analyze shell code.
@@ -113,10 +150,4 @@ code. To analyze dirty files:
 
 ```shell
 ./scripts/lint.sh
-```
-
-To analyze all files:
-
-```shell
-./scripts/lint.sh all
 ```
