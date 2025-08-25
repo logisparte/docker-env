@@ -55,7 +55,8 @@ _help() {
     echo "  exec [SERVICE] -- COMMAND|Execute a command in a dev env container"
     echo "  up [OPTIONS]|Build/pull images, create and start dev containers"
     echo "  down [OPTIONS]|Stop and remove dev containers"
-    echo "  init|Init environment without building or pulling images"
+    echo "  build [OPTIONS]|Build dev env images"
+    echo "  init|Init dev env without building or pulling images"
     echo "  compose [ARGUMENTS...]|Directly call 'docker compose' with project settings"
     echo
     echo \
@@ -317,14 +318,15 @@ else
       _compose down "$@"
       ;;
 
+    build)
+      shift
+      _init
+      _compose build "$@"
+      ;;
+
     init)
       shift
       _init "$@"
-      ;;
-
-    build)
-      shift
-      _compose build "$@"
       ;;
 
     compose)
