@@ -253,6 +253,11 @@ _init() {
 
 _tag() {
   TARGET_TAG="$1"
+  if [ -z "$TARGET_TAG" ]; then
+    echo "docker-env: Missing tag argument" >&2
+    echo "  Usage: ./docker/env.sh tag TARGET_TAG"
+    exit 1
+  fi
 
   DEV_IMAGES="$({
     docker image ls --format "{{.Repository}}:{{.Tag}}" \
@@ -264,6 +269,13 @@ _tag() {
     DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
     docker tag "$DEV_IMAGE" "$DEV_IMAGE_REPOSITORY:$TARGET_TAG"
   done
+}
+
+_push() {
+  docker image ls --format "{{.Repository}}" \
+    | grep "-env" \
+    | sort -u \
+    | xargs docker image push --all-tags
 }
 
 COMMAND="${1:---help}"
@@ -349,7 +361,7 @@ else
 
     push)
       shift
-      _compose push "$@"
+      _push "$@"
       ;;
 
     tag)
