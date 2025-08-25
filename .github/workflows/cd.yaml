@@ -44,4 +44,4 @@ jobs:
           exit 1
 
       - name: Tag dev image with version
-        run: ./docker/env.sh compose build --push
+        run: ./docker/env.sh build --push

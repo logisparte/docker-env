@@ -124,8 +124,21 @@ EOF
 _generate_project_base() {
   rm -rf "$PROJECT_CACHE_DIRECTORY"
   mkdir -p "$PROJECT_CACHE_DIRECTORY"
+  touch "$PROJECT_BASE_COMPOSE_FILE"
 
-  cat > "$PROJECT_BASE_COMPOSE_FILE" << EOF
+  if [ -n "$BUILD_PLATFORMS" ]; then
+    echo "x-platforms: &platforms" >> "$PROJECT_BASE_COMPOSE_FILE"
+    echo "  platforms:" >> "$PROJECT_BASE_COMPOSE_FILE"
+    ORIGINAL_IFS="$IFS"
+    IFS=','
+    for PLATFORM in $BUILD_PLATFORMS; do
+      echo "    - $PLATFORM" >> "$PROJECT_BASE_COMPOSE_FILE"
+    done
+    IFS="$ORIGINAL_IFS"
+  fi
+
+  cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
+
 services:
   docker-env:
     extends:
@@ -149,16 +162,6 @@ services:
     working_dir: \$PWD
     entrypoint: ["$PROJECT_DOCKER_DIRECTORY/env.sh", "_entrypoint"]
 EOF
-
-  if [ -n "$BUILD_PLATFORMS" ]; then
-    echo "    platforms:" >> "$PROJECT_BASE_COMPOSE_FILE"
-    ORIGINAL_IFS="$IFS"
-    IFS=','
-    for PLATFORM in $BUILD_PLATFORMS; do
-      echo "      - $PLATFORM" >> "$PROJECT_BASE_COMPOSE_FILE"
-    done
-    IFS="$ORIGINAL_IFS"
-  fi
 
   for DOCKERFILE in "$PROJECT_DOCKER_DIRECTORY"/*Dockerfile; do
     if [ ! -f "$DOCKERFILE" ]; then
@@ -189,6 +192,9 @@ EOF
       tags:
         - $IMAGE:${DOCKER_ENV_PUSH_TAG:-latest}
 EOF
+    if [ -n "$BUILD_PLATFORMS" ]; then
+      echo "      <<: *platforms" >> "$PROJECT_BASE_COMPOSE_FILE"
+    fi
   done
 }
 
