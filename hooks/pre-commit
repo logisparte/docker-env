@@ -1,4 +1,0 @@
-#!/bin/sh -e
-
-./scripts/format.sh staged
-./scripts/lint.sh staged

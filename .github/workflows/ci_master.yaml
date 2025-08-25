@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read # Required by actions/checkout
-  packages: write # Required to push docker image to registry
+  packages: write # Required to pull/push docker image from/to registry
 
 env:
   DOCKER_ENV_REGISTRY: ${{ vars.DOCKER_ENV_REGISTRY }}
@@ -15,6 +15,8 @@ env:
 jobs:
   cache_dev_image:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_ENV_PUSH_TAG: ${{ github.sha }}
     steps:
       - name: Set up multiarch docker builder
         uses: docker/setup-buildx-action@v3
@@ -33,11 +35,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build, tag and push docker env
-        run: |
-          IMAGE_NAME="$(./docker/env.sh name)"
-          ./docker/env.sh build \
-            --platform linux/arm64 \
-            --platform linux/amd64 \
-            --tag "$IMAGE_NAME:latest" \
-            --tag "$IMAGE_NAME:${{ github.sha }}" \
-            --push
+        run: ./docker/env.sh compose build --push

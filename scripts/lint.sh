@@ -1,55 +1,41 @@
 #!/bin/sh -e
 
-. ./scripts/utils/colorize.sh
-. ./scripts/utils/git/list_all_files.sh
-. ./scripts/utils/git/list_dirty_files.sh
-. ./scripts/utils/git/list_staged_files.sh
+#
+# Lint files
+#
+
 . ./scripts/utils/report.sh
 
-FILTER="${1:-dirty}"
+lint() {
+  EXTENSION="$1"
 
-case "$FILTER" in
-  dirty)
-    report --info "[lint] Linting dirty files only"
-    FILES="$(list_dirty_files)"
-    ;;
+  report --info "[lint] Linting ${EXTENSION:-all} files"
+  case "$EXTENSION" in
+    "")
+      _lint_sh
+      _lint_md
+      ;;
 
-  staged)
-    report --info "[lint] Linting staged files only"
-    FILES=$(list_staged_files)
-    ;;
+    sh | md)
+      "_lint_$EXTENSION"
+      ;;
 
-  all)
-    report --info "[lint] Linting all files"
-    FILES="$(list_all_files)"
-    ;;
+    *)
+      report --error "[lint] Unknown file extension: $EXTENSION"
+      exit 1
+      ;;
 
-  *)
-    report --error "[lint] Unknown filter: '$FILTER'"
-    exit 1
-    ;;
-esac
+  esac
 
-# Skip symbolic links
-FILES="$({
-  for FILE in $FILES; do
-    [ -L "$FILE" ] && continue
-    echo "$FILE"
-  done
-})"
+  report --success "[lint] Done"
+}
 
-MARKDOWN_FILES="$(echo "$FILES" | grep -e "\.md$" || true)"
-if [ -n "$MARKDOWN_FILES" ]; then
-  report --info "Markdown files >>"
-  report "$(colorize --gray "$MARKDOWN_FILES")"
-  echo "$MARKDOWN_FILES" | xargs markdownlint
-fi
+_lint_sh() {
+  find scripts -name "*.sh" -type f -exec shellcheck {} \;
+}
 
-SHELLCHECK_FILES="$(echo "$FILES" | grep -e "\.sh$" || true)"
-if [ -n "$SHELLCHECK_FILES" ]; then
-  report --info "Shell files >>"
-  report "$(colorize --gray "$SHELLCHECK_FILES")"
-  echo "$SHELLCHECK_FILES" | xargs shellcheck
-fi
+_lint_md() {
+  markdownlint --ignore-path .gitignore .
+}
 
-report --success "[lint] Done"
+lint "$@"

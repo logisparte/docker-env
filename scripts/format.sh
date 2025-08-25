@@ -1,54 +1,54 @@
 #!/bin/sh -e
 
+#
+# Format files
+#
+
 . ./scripts/utils/colorize.sh
-. ./scripts/utils/git/list_all_files.sh
-. ./scripts/utils/git/list_dirty_files.sh
-. ./scripts/utils/git/list_staged_files.sh
 . ./scripts/utils/report.sh
 
-FILTER="${1:-dirty}"
+format() {
+  EXTENSION="$1"
 
-case "$FILTER" in
-  dirty)
-    report --info "[format] Formatting dirty files only"
-    FILES="$(list_dirty_files)"
-    ;;
+  report --info "[format] Formatting ${EXTENSION:-all} files"
+  case "$EXTENSION" in
+    "")
+      _format_sh
+      _format_prettier
+      ;;
 
-  staged)
-    report --info "[format] Formatting staged files only"
-    FILES=$(list_staged_files)
-    ;;
+    sh)
+      "_format_sh"
+      ;;
 
-  all)
-    report --info "[format] Formatting all files"
-    FILES="$(list_all_files)"
-    ;;
+    yaml | md)
+      _format_prettier "$EXTENSION"
+      ;;
 
-  *)
-    report --error "[format] Unknown filter: '$FILTER'"
-    exit 1
-    ;;
-esac
+    *)
+      report --error "[format] Unknown file extension: $EXTENSION"
+      exit 1
+      ;;
 
-# Skip symbolic links
-FILES="$({
-  for FILE in $FILES; do
-    [ -L "$FILE" ] && continue
-    echo "$FILE"
-  done
-})"
+  esac
 
-PRETTIER_FILES="$(echo "$FILES" | grep -e "\.md$" -e "\.yaml$" || true)"
-if [ -n "$PRETTIER_FILES" ]; then
-  report --info "Markdown and yaml files >>"
-  echo "$PRETTIER_FILES" | xargs prettier --write
-fi
+  report --success "[format] Done"
+}
 
-SHFMT_FILES="$(echo "$FILES" | grep -e "\.sh$" || true)"
-if [ -n "$SHFMT_FILES" ]; then
-  report --info "Shell files >>"
-  report "$(colorize --gray "$SHFMT_FILES")"
-  echo "$SHFMT_FILES" | xargs shfmt -p -w -bn -ci -sr -kp -i 2
-fi
+_format_sh() {
+  SHELL_FILES="$(find scripts -name "*.sh" -type f)"
+  report "$(colorize --gray "$SHELL_FILES")"
+  echo "$SHELL_FILES" | xargs shfmt -p -w -bn -ci -sr -i 2
+}
 
-report --success "[format] Done"
+_format_prettier() {
+  EXTENSION="$1"
+
+  if [ -n "$EXTENSION" ]; then
+    prettier --ignore-unknown --write "./**/*.$EXTENSION"
+  else
+    prettier --ignore-unknown --write .
+  fi
+}
+
+format "$@"
