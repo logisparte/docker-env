@@ -251,6 +251,12 @@ _init() {
   _generate_project_base
 }
 
+_list_dev_images() {
+  docker image ls --format "{{.Repository}}:{{.Tag}}" \
+    | grep "-env:$BASE_TAG" \
+    | sort -u
+}
+
 _tag() {
   TARGET_TAG="$1"
   if [ -z "$TARGET_TAG" ]; then
@@ -259,23 +265,17 @@ _tag() {
     exit 1
   fi
 
-  DEV_IMAGES="$({
-    docker image ls --format "{{.Repository}}:{{.Tag}}" \
-      | grep "-env:$BASE_TAG" \
-      | sort -u
-  })"
-
-  for DEV_IMAGE in $DEV_IMAGES; do
+  for DEV_IMAGE in $(_list_dev_images); do
     DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
     docker tag "$DEV_IMAGE" "$DEV_IMAGE_REPOSITORY:$TARGET_TAG"
   done
 }
 
 _push() {
-  docker image ls --format "{{.Repository}}" \
-    | grep "-env" \
-    | sort -u \
-    | xargs docker image push --all-tags
+  for DEV_IMAGE in $(_list_dev_images); do
+    DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
+    docker push --all-tags "$DEV_IMAGE_REPOSITORY"
+  done
 }
 
 COMMAND="${1:---help}"

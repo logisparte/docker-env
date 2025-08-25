@@ -102,9 +102,9 @@ create containers, start them and open an interactive shell in the dev env conta
 #### CI workflows
 
 You can use `./docker/env.sh exec -- COMMAND` to build/pull images, create containers, start
-them and execute a command in the dev env container. The `init` and `build` subcommands,
-alongside some [environment variables](#environment-variables) can also be used to
-build/pull/push/tag dev env images.
+them and execute a command in the dev env container. The `init`, `build`, `pull`, `push` and
+`tag` subcommands, alongside some [environment variables](#environment-variables) can also be
+used to craft efficient workflows.
 
 > You can look at this repo's CI/CD workflows for inspiration
 
