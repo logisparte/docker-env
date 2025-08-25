@@ -156,14 +156,14 @@ EOF
 
     FILE_NAME="$(basename "$DOCKERFILE")"
     if [ "$FILE_NAME" = "Dockerfile" ]; then
-      SERVICE=
+      _SERVICE=
     else
-      SERVICE="$(echo "$FILE_NAME" | cut -d "." -f 1)"
+      _SERVICE="$(echo "$FILE_NAME" | cut -d "." -f 1)"
     fi
 
-    IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${SERVICE:+-$SERVICE}-env"
+    IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${_SERVICE:+-${_SERVICE}}-env"
     cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
-  ${SERVICE:-dev}:
+  ${_SERVICE:-$PROJECT_DEFAULT_SERVICE}:
     extends:
       service: docker-env
     image: $IMAGE:${DOCKER_ENV_PULL_TAG:-latest}
@@ -229,79 +229,82 @@ _up() {
 
 COMMAND="${1:---help}"
 if [ "$DOCKER_ENV" ]; then
-  if [ "$COMMAND" = "_entrypoint" ]; then
-    shift
-    _entrypoint "$@"
+  case "$COMMAND" in
+    _entrypoint)
+      shift
+      "$COMMAND" "$@"
+      ;;
 
-  else
-    echo "docker-env: Already inside a dev env container." >&2
-    exit 1
-  fi
-fi
+    *)
+      echo "docker-env: Already inside a dev env container." >&2
+      exit 1
+      ;;
+  esac
+else
+  case "$COMMAND" in
+    -h | --help)
+      _help
+      ;;
 
-case "$COMMAND" in
-  -h | --help)
-    _help
-    ;;
+    shell)
+      shift
+      MAYBE_SERVICE="$1"
+      _is_up || _up
+      _compose exec \
+        --env DOCKER_ENV_NAME="$PROJECT_NAME${MAYBE_SERVICE:+-$MAYBE_SERVICE}-env" \
+        "${MAYBE_SERVICE:-$PROJECT_DEFAULT_SERVICE}" \
+        "${SHELL:-/bin/sh}" --login
+      ;;
 
-  shell)
-    shift
-    MAYBE_SERVICE="$1"
-    _is_up || _up
-    _compose exec \
-      --env DOCKER_ENV_NAME="$PROJECT_NAME${MAYBE_SERVICE:+-$MAYBE_SERVICE}-env" \
-      "${MAYBE_SERVICE:-$PROJECT_DEFAULT_SERVICE}" \
-      "${SHELL:-/bin/sh}" --login
-    ;;
-
-  exec)
-    shift
-    case "$1" in
-      "")
-        echo "docker-env: Missing exec arguments" >&2
-        echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
-        exit 1
-        ;;
-
-      "--")
-        SERVICE="$PROJECT_DEFAULT_SERVICE"
-        shift
-        ;;
-
-      *)
-        SERVICE="$1"
-        shift
-        if [ "$1" != "--" ]; then
-          echo "docker-env: Missing service/command separator '--'" >&2
+    exec)
+      shift
+      case "$1" in
+        "")
+          echo "docker-env: Missing exec arguments" >&2
           echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
           exit 1
-        fi
-        shift
-        ;;
-    esac
+          ;;
 
-    _is_up || _up
-    _compose exec "$SERVICE" "$@"
-    ;;
+        --)
+          SERVICE="$PROJECT_DEFAULT_SERVICE"
+          shift
+          ;;
 
-  up)
-    shift
-    _up "$@"
-    ;;
+        *)
+          SERVICE="$1"
+          shift
+          if [ "$1" != "--" ]; then
+            echo "docker-env: Missing service/command separator '--'" >&2
+            echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
+            exit 1
+          fi
+          shift
+          ;;
+      esac
 
-  down)
-    shift
-    _compose down "$@"
-    ;;
+      _is_up || _up
+      _compose exec "$SERVICE" "$@"
+      ;;
 
-  compose)
-    shift
-    _compose "$@"
-    ;;
+    up)
+      shift
+      _up "$@"
+      ;;
 
-  *)
-    echo "docker-env: '$COMMAND' is not a docker-env command." >&2
-    echo "See '$PROJECT_DOCKER_DIRECTORY/env.sh --help'" >&2
-    exit 1
-    ;;
-esac
+    down)
+      shift
+      _compose down "$@"
+      ;;
+
+    compose)
+      shift
+      _compose "$@"
+      ;;
+
+    *)
+      echo "docker-env: '$COMMAND' is not a docker-env command." >&2
+      echo "See '$PROJECT_DOCKER_DIRECTORY/env.sh --help'" >&2
+      exit 1
+      ;;
+  esac
+fi
