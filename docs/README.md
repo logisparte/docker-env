@@ -47,14 +47,14 @@ You can customize the following environment variables:
 | var                                   | default                                             | description                                                      |
 | ------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
 | `DOCKER_ENV_PROJECT_NAME`             | Repository name                                     | Name of your project (used to generated images and containers)   |
-| `DOCKER_ENV_PROJECT_DOCKER_DIRECTORY` | `$PWD/docker`                                       | Project directory                                                |
+| `DOCKER_ENV_PROJECT_ENV_FILE`         | `$PWD/.env`                                         | Local environment file                                           |
+| `DOCKER_ENV_PROJECT_DOCKER_DIRECTORY` | `$PWD/docker`                                       | Project docker directory, where docker-env files are located     |
 | `DOCKER_ENV_PROJECT_COMPOSE_FILE`     | `$DOCKER_ENV_PROJECT_DOCKER_DIRECTORY/compose.yaml` | The dev env compose file, where services are defined             |
 | `DOCKER_ENV_PROJECT_CACHE_DIRECTORY`  | `$PWD/.cache/docker-env`                            | Where docker-env will store its generated files for your project |
 | `DOCKER_ENV_PROJECT_DEFAULT_SERVICE`  | dev                                                 | Default dev env service to use when unspecified                  |
 | `DOCKER_ENV_BUILD_PLATFORMS`          | -                                                   | Target platforms when building images                            |
 | `DOCKER_ENV_REGISTRY`                 | -                                                   | Registry where built images will be pulled/pushed from/to        |
-| `DOCKER_ENV_PULL_TAG`                 | latest                                              | Image tag to pull from registry                                  |
-| `DOCKER_ENV_PUSH_TAG`                 | latest                                              | Tag built images with value before pushing to registry           |
+| `DOCKER_ENV_TAG`                      | latest                                              | Image tag to build/pull from registry                            |
 
 These variables are readonly:
 

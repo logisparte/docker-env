@@ -28,7 +28,7 @@ USER_HOST_SUDOER_FILE="$USER_HOST_DIRECTORY/sudoer"
 USER_COMPOSE_FILE="$USER_DIRECTORY/compose.yaml"
 
 # Load project .env, if any
-PROJECT_ENV_FILE="${DOCKER_ENV_PROJECT_ENV_FILE:-"./.env"}"
+PROJECT_ENV_FILE="${DOCKER_ENV_PROJECT_ENV_FILE:-"$PWD/.env"}"
 if [ -f "$PROJECT_ENV_FILE" ]; then
   set -a
   . "$PROJECT_ENV_FILE"
@@ -41,6 +41,7 @@ PROJECT_COMPOSE_FILE="${DOCKER_ENV_PROJECT_COMPOSE_FILE:-"$PROJECT_DOCKER_DIRECT
 PROJECT_CACHE_DIRECTORY="${DOCKER_ENV_PROJECT_CACHE_DIRECTORY:-$PWD/.cache/docker-env}"
 PROJECT_BASE_COMPOSE_FILE="$PROJECT_CACHE_DIRECTORY/base.compose.yaml"
 PROJECT_DEFAULT_SERVICE="${DOCKER_ENV_PROJECT_DEFAULT_SERVICE:-"dev"}"
+BASE_TAG="${DOCKER_ENV_TAG:-latest}"
 BUILD_PLATFORMS="${DOCKER_ENV_BUILD_PLATFORMS:-}"
 
 _help() {
@@ -56,6 +57,9 @@ _help() {
     echo "  up [OPTIONS]|Build/pull images, create and start dev containers"
     echo "  down [OPTIONS]|Stop and remove dev containers"
     echo "  build [OPTIONS]|Build dev env images"
+    echo "  pull [OPTIONS]|Pull dev images"
+    echo "  push [OPTIONS]|Push dev images"
+    echo "  tag TARGET_TAG|Tag dev env images"
     echo "  init|Init dev env without building or pulling images"
     echo "  compose [ARGUMENTS...]|Directly call 'docker compose' with project settings"
     echo
@@ -182,16 +186,14 @@ EOF
   ${_SERVICE:-$PROJECT_DEFAULT_SERVICE}:
     extends:
       service: docker-env
-    image: $IMAGE:${DOCKER_ENV_PULL_TAG:-latest}
+    image: $IMAGE:$BASE_TAG
     build:
       dockerfile: $DOCKERFILE
       pull: true
       cache_from:
-        - $IMAGE:${DOCKER_ENV_PULL_TAG:-latest}
+        - $IMAGE:$BASE_TAG
       cache_to:
         - type=inline
-      tags:
-        - $IMAGE:${DOCKER_ENV_PUSH_TAG:-latest}
 EOF
     if [ -n "$BUILD_PLATFORMS" ]; then
       echo "      <<: *platforms" >> "$PROJECT_BASE_COMPOSE_FILE"
@@ -247,6 +249,21 @@ _up() {
 _init() {
   [ -d "$USER_DIRECTORY" ] || _init_user
   _generate_project_base
+}
+
+_tag() {
+  TARGET_TAG="$1"
+
+  DEV_IMAGES="$({
+    docker image ls --format "{{.Repository}}:{{.Tag}}" \
+      | grep "-env:$BASE_TAG" \
+      | sort -u
+  })"
+
+  for DEV_IMAGE in $DEV_IMAGES; do
+    DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
+    docker tag "$DEV_IMAGE" "$DEV_IMAGE_REPOSITORY:$TARGET_TAG"
+  done
 }
 
 COMMAND="${1:---help}"
@@ -322,6 +339,22 @@ else
       shift
       _init
       _compose build "$@"
+      ;;
+
+    pull)
+      shift
+      _init
+      _compose pull "$@"
+      ;;
+
+    push)
+      shift
+      _compose push "$@"
+      ;;
+
+    tag)
+      shift
+      _tag "$@"
       ;;
 
     init)
