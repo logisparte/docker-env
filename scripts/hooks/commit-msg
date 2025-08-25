@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+#
+# commit-msg hook. Lints commit messages.
+#
+
+commitlint --edit "$@"

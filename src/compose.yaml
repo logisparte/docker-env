@@ -1,38 +1,5 @@
-#
-# docker-env 0.3.2
-#
-# Copyright 2025 logisparte inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 services:
   dev:
-    image: $IMAGE_NAME
-    env_file:
-      - path: $PWD/.env
-        required: false
-    environment:
-      DOCKER_ENV_CURRENT: $IMAGE_NAME
-      SSH_AUTH_SOCK: $HOST_SSH_AUTH_SOCK
-      TERM:
-      CI:
-    user: $HOST_UID:$HOST_GID
-    volumes:
-      - ${HOST_SSH_AUTH_SOCK:-/dev/null}:${HOST_SSH_AUTH_SOCK:-/dev/null}
-      - $HOME/.config/docker-env/host/group:/etc/group:ro
-      - $HOME/.config/docker-env/host/passwd:/etc/passwd:ro
-      - $HOME/.config/docker-env/host/sudoer:/etc/sudoers.d/$HOST_USER:ro
-      - $PWD:$PWD
-    working_dir: $PWD
-    entrypoint: ["$PWD/docker/env.sh", "_entrypoint"]
+    extends:
+      service: dev
+      file: $DOCKER_ENV_PROJECT_BASE_COMPOSE_FILE

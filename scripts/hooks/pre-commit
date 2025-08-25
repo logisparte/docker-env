@@ -1,0 +1,45 @@
+#!/bin/sh -e
+
+#
+# pre-commit hook. Formats and lints staged files.
+#
+
+. ./scripts/utils/git/list_staged_files.sh
+. ./scripts/utils/report.sh
+
+# Select staged files
+FILES=$(list_staged_files)
+if [ -z "$FILES" ]; then
+  exit 0
+fi
+
+# Format
+SHELL_FILES="$(echo "$FILES" | grep -e "\.sh$" || true)"
+if [ -n "$SHELL_FILES" ]; then
+  report --info "[pre-commit] Formatting committed shell files"
+  report "$(colorize --gray "$SHELL_FILES")"
+  echo "$SHELL_FILES" | xargs shfmt -p -w -bn -ci -sr -i 2
+  echo "$SHELL_FILES" | xargs git add
+fi
+
+PRETTIER_FILES="$(echo "$FILES" | grep -e "\.md$" -e "\.yaml$" || true)"
+if [ -n "$PRETTIER_FILES" ]; then
+  report --info "[pre-commit] Formatting committed markdown and yaml files"
+  echo "$PRETTIER_FILES" | xargs npm exec -- prettier --write
+  echo "$PRETTIER_FILES" | xargs git add
+fi
+
+# Lint
+SHELL_FILES="$(echo "$FILES" | grep -e "\.sh$" || true)"
+if [ -n "$SHELL_FILES" ]; then
+  report --info "[pre-commit] Linting committed shell files"
+  echo "$SHELL_FILES" | xargs shellcheck
+fi
+
+MARKDOWN_FILES="$(echo "$FILES" | grep -e "\.md$" || true)"
+if [ -n "$MARKDOWN_FILES" ]; then
+  report --info "[pre-commit] Linting committed markdown files"
+  echo "$MARKDOWN_FILES" | xargs markdownlint
+fi
+
+report --success "[pre-commit] Done"

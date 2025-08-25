@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# docker-env 0.3.2
+# docker-env 0.4.0
 #
 # Copyright 2025 logisparte inc.
 #
@@ -17,81 +17,54 @@
 # limitations under the License.
 #
 
-if [ -f "$PWD/.env" ]; then
-  set -a
-  . "$PWD/.env"
-  set +a
-fi
+export COMPOSE_BAKE=true
 
-PROJECT_NAME="$(basename "$PWD")"
-export IMAGE_NAME="$PROJECT_NAME-dev"
-if [ -n "$DOCKER_ENV_REGISTRY" ]; then
-  export IMAGE_NAME="$DOCKER_ENV_REGISTRY/$IMAGE_NAME"
-fi
-
-PROJECT_DOCKER_DIRECTORY="$PWD/docker"
-PROJECT_COMPOSE_FILE="$PROJECT_DOCKER_DIRECTORY/compose.yaml"
-PROJECT_DOCKERFILE="$PROJECT_DOCKER_DIRECTORY/Dockerfile"
 USER_DIRECTORY="$HOME/.config/docker-env"
-USER_COMPOSE_FILE="$USER_DIRECTORY/compose.yaml"
 USER_HOST_DIRECTORY="$USER_DIRECTORY/host"
 USER_HOST_COMPOSE_ENV_FILE="$USER_HOST_DIRECTORY/.env"
 USER_HOST_PASSWD_FILE="$USER_HOST_DIRECTORY/passwd"
 USER_HOST_GROUP_FILE="$USER_HOST_DIRECTORY/group"
 USER_HOST_SUDOER_FILE="$USER_HOST_DIRECTORY/sudoer"
+USER_COMPOSE_FILE="$USER_DIRECTORY/compose.yaml"
 
-export COMPOSE_BAKE=true
+# Load project .env, if any
+PROJECT_ENV_FILE="${DOCKER_ENV_PROJECT_ENV_FILE:-"./.env"}"
+if [ -f "$PROJECT_ENV_FILE" ]; then
+  set -a
+  . "$PROJECT_ENV_FILE"
+  set +a
+fi
+
+PROJECT_NAME="${DOCKER_ENV_PROJECT_NAME:-"$(basename "$PWD")"}"
+PROJECT_DOCKER_DIRECTORY="${DOCKER_ENV_PROJECT_DOCKER_DIRECTORY:-"$PWD/docker"}"
+PROJECT_COMPOSE_FILE="${DOCKER_ENV_PROJECT_COMPOSE_FILE:-"$PROJECT_DOCKER_DIRECTORY/compose.yaml"}"
+PROJECT_CACHE_DIRECTORY="${DOCKER_ENV_PROJECT_CACHE_DIRECTORY:-$PWD/.cache/docker-env}"
+PROJECT_BASE_COMPOSE_FILE="$PROJECT_CACHE_DIRECTORY/base.compose.yaml"
+PROJECT_DEFAULT_SERVICE="${DOCKER_ENV_PROJECT_DEFAULT_SERVICE:-"dev"}"
 
 _help() {
   {
     echo
-    echo "Usage: ./docker/env.sh COMMAND [OPTIONS] [ARGS...]"
+    echo "Usage: $PROJECT_DOCKER_DIRECTORY/env.sh COMMAND [OPTIONS] [ARGS...]"
     echo
-    echo "Encapsulate your project's development environment inside a Docker container"
+    echo "Encapsulate your project's dev environment inside one or more Docker containers using docker compose"
     echo
     echo "Commands:"
-    echo "  name|Output the dev image name"
-    echo "  init [OPTIONS]|Prepare user host files and build dev image"
-    echo "  build [OPTIONS]|Build dev image"
-    echo "  clean [OPTIONS]|Delete user host files and dev image"
-    echo "  up|Create and start a persistent dev container"
-    echo "  down|Stop and remove the dev container"
-    echo "  exec|Execute a command in the running dev container"
-    echo "  shell|Open an interactive shell in the running dev container"
-    echo "  tag [NEW_TAG=latest] [CURRENT_TAG=]|Tag the dev image"
-    echo "  pull [TAG=latest]|Pull the dev image from the \$DOCKER_ENV_REGISTRY"
-    echo "  push [TAG=latest]|Push the dev image to the \$DOCKER_ENV_REGISTRY"
+    echo "  shell [SERVICE]|Open an interactive shell in a dev env container"
+    echo "  exec [SERVICE] -- COMMAND|Execute a command in a dev env container"
+    echo "  up [OPTIONS]|Build/pull images, create and start dev containers"
+    echo "  down [OPTIONS]|Stop and remove dev containers"
+    echo "  compose [ARGUMENTS...]|Directly call 'docker compose' with project settings"
     echo
     echo \
-      "For more help on how to use docker-env, head to https://github.com/logisparte/docker-env"
+      "For more info on how to use docker-env, head to https://github.com/logisparte/docker-env"
   } | awk -F "|" '{printf "%-40s %s\n", $1, $2}'
 }
 
-# To use docker compose with project's compose file, host files and optional user customizations
-_compose() {
-  if [ -f "$USER_COMPOSE_FILE" ]; then
-    set -- --file "$USER_COMPOSE_FILE" "$@"
-  fi
-
-  docker compose \
-    --project-name "$PROJECT_NAME" \
-    --env-file "$USER_HOST_COMPOSE_ENV_FILE" \
-    --file "$PROJECT_COMPOSE_FILE" \
-    "$@"
-}
-
-# Prepare host files to map host user into container
-_init() {
-  if [ -d "$USER_HOST_DIRECTORY" ]; then
-    echo "docker-env: User host files already exist at $USER_HOST_DIRECTORY, skipping."
-    return 0
-  fi
-
-  # Clear docker host directory
-  rm -rf "$USER_HOST_DIRECTORY"
+# Prepare host files to map host user into dev env containers
+_init_user() {
   mkdir -p "$USER_HOST_DIRECTORY"
 
-  # Ensure user IDs
   HOST_USER="$(id -un)"
   HOST_UID="$(id -u)"
   HOST_GID="$(id -g)"
@@ -127,33 +100,88 @@ _init() {
   fi
 
   # docker compose env file
-  {
-    echo "HOST_USER=$HOST_USER"
-    echo "HOST_UID=$HOST_UID"
-    echo "HOST_GID=$HOST_GID"
-    echo "HOST_SSH_AUTH_SOCK=$HOST_SSH_AUTH_SOCK"
-  } > "$USER_HOST_COMPOSE_ENV_FILE"
+  cat > "$USER_HOST_COMPOSE_ENV_FILE" << EOF
+HOST_USER=$HOST_USER
+HOST_UID=$HOST_UID
+HOST_GID=$HOST_GID
+HOST_SSH_AUTH_SOCK=$HOST_SSH_AUTH_SOCK
+EOF
+
+  # User compose file
+  if [ ! -f "$USER_COMPOSE_FILE" ]; then
+    cat > "$USER_COMPOSE_FILE" << EOF
+services:
+  user:
+    # Add your customizations here, example:
+    # volumes:
+    #   - ./custom_volume:/custom_volume
+EOF
+  fi
 }
 
-# Build the image from cache, if possible
-_build() {
-  docker image build \
-    --file "$PROJECT_DOCKERFILE" \
-    --tag "$IMAGE_NAME" \
-    --cache-from "type=registry,ref=$IMAGE_NAME" \
-    --cache-to type=inline \
-    --pull \
-    "$@" \
-    .
+_generate_project_base() {
+  rm -rf "$PROJECT_CACHE_DIRECTORY"
+  mkdir -p "$PROJECT_CACHE_DIRECTORY"
+
+  cat > "$PROJECT_BASE_COMPOSE_FILE" << EOF
+services:
+  docker-env:
+    extends:
+      service: user
+      file: $USER_COMPOSE_FILE
+    env_file:
+      - path: $PROJECT_ENV_FILE
+        required: false
+    environment:
+      DOCKER_ENV: true
+      SSH_AUTH_SOCK: \$HOST_SSH_AUTH_SOCK
+      TERM:
+      CI:
+    user: \$HOST_UID:\$HOST_GID
+    volumes:
+      - \${HOST_SSH_AUTH_SOCK:-/dev/null}:\${HOST_SSH_AUTH_SOCK:-/dev/null}
+      - $HOME/.config/docker-env/host/group:/etc/group:ro
+      - $HOME/.config/docker-env/host/passwd:/etc/passwd:ro
+      - $HOME/.config/docker-env/host/sudoer:/etc/sudoers.d/\$HOST_USER:ro
+      - \$PWD:\$PWD
+    working_dir: \$PWD
+    entrypoint: ["$PROJECT_DOCKER_DIRECTORY/env.sh", "_entrypoint"]
+
+EOF
+
+  for DOCKERFILE in "$PROJECT_DOCKER_DIRECTORY"/*Dockerfile; do
+    if [ ! -f "$DOCKERFILE" ]; then
+      continue
+    fi
+
+    FILE_NAME="$(basename "$DOCKERFILE")"
+    if [ "$FILE_NAME" = "Dockerfile" ]; then
+      SERVICE=
+    else
+      SERVICE="$(echo "$FILE_NAME" | cut -d "." -f 1)"
+    fi
+
+    IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${SERVICE:+-$SERVICE}-env"
+    cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
+  ${SERVICE:-dev}:
+    extends:
+      service: docker-env
+    image: $IMAGE:${DOCKER_ENV_PULL_TAG:-latest}
+    build:
+      dockerfile: $DOCKERFILE
+      pull: true
+      cache_from:
+        - $IMAGE:${DOCKER_ENV_PULL_TAG:-latest}
+      cache_to:
+        - type=inline
+      tags:
+        - $IMAGE:${DOCKER_ENV_PUSH_TAG:-latest}
+
+EOF
+  done
 }
 
-# Delete host files and image
-_clean() {
-  rm -rf "$USER_HOST_DIRECTORY"
-  docker image remove "$IMAGE_NAME" "$@"
-}
-
-# Container entrypoint (used inside container)
+# Container entrypoint (used inside dev env containers)
 _entrypoint() {
   USERNAME="$(id -un)"
 
@@ -179,14 +207,34 @@ _entrypoint() {
   fi
 }
 
+# To use docker compose with project's compose file and docker-env configurations
+_compose() {
+  DOCKER_ENV_PROJECT_BASE_COMPOSE_FILE="$PROJECT_BASE_COMPOSE_FILE" \
+    docker compose \
+    --project-name "$PROJECT_NAME" \
+    --env-file "$USER_HOST_COMPOSE_ENV_FILE" \
+    --file "$PROJECT_COMPOSE_FILE" \
+    "$@"
+}
+
+_is_up() {
+  _compose ls --quiet | grep "$PROJECT_NAME" > /dev/null 2>&1
+}
+
+_up() {
+  [ -d "$USER_DIRECTORY" ] || _init_user
+  _generate_project_base
+  _compose up --wait "$@"
+}
+
 COMMAND="${1:---help}"
-if [ -n "$DOCKER_ENV_CURRENT" ]; then
+if [ "$DOCKER_ENV" ]; then
   if [ "$COMMAND" = "_entrypoint" ]; then
     shift
     _entrypoint "$@"
 
   else
-    echo "docker-env: Already inside the dev container." >&2
+    echo "docker-env: Already inside a dev env container." >&2
     exit 1
   fi
 fi
@@ -196,80 +244,54 @@ case "$COMMAND" in
     _help
     ;;
 
-  name)
-    echo "$IMAGE_NAME"
-    ;;
-
-  init)
+  shell)
     shift
-    _init
-    _build "$@"
-    ;;
-
-  clean)
-    shift
-    _clean "$@"
-    ;;
-
-  build)
-    shift
-    _build "$@"
-    ;;
-
-  up)
-    _compose up --wait
-    ;;
-
-  down)
-    _compose down
+    MAYBE_SERVICE="$1"
+    _is_up || _up
+    _compose exec \
+      --env DOCKER_ENV_NAME="$PROJECT_NAME${MAYBE_SERVICE:+-$MAYBE_SERVICE}-env" \
+      "${MAYBE_SERVICE:-$PROJECT_DEFAULT_SERVICE}" \
+      "${SHELL:-/bin/sh}" --login
     ;;
 
   exec)
     shift
-    _compose exec dev "$@"
-    ;;
+    if [ "$1" != "--" ]; then
+      SERVICE="$1"
+      shift
 
-  shell)
-    _compose exec dev "${SHELL:-/bin/sh}" --login
-    ;;
-
-  tag)
-    shift
-    NEW_TAG="${1:-latest}"
-    if [ $# -gt 1 ]; then
-      CURRENT_IMAGE_NAME="$IMAGE_NAME:$2"
     else
-      CURRENT_IMAGE_NAME="$IMAGE_NAME"
+      SERVICE="$PROJECT_DEFAULT_SERVICE"
     fi
 
-    docker image tag "$CURRENT_IMAGE_NAME" "$IMAGE_NAME:$NEW_TAG"
-    ;;
-
-  pull)
-    if [ -z "$DOCKER_ENV_REGISTRY" ]; then
-      echo "docker-env: 'DOCKER_ENV_REGISTRY' is not set, cannot proceed with pull." >&2
+    if [ "$1" != "--" ]; then
+      echo "docker-env: Missing command separator '--'" >&2
       exit 1
     fi
 
     shift
-    TAG="${1:-latest}"
-    docker image pull "$IMAGE_NAME:$TAG"
+    _is_up || _up
+    _compose exec "$SERVICE" "$@"
     ;;
 
-  push)
-    if [ -z "$DOCKER_ENV_REGISTRY" ]; then
-      echo "docker-env: 'DOCKER_ENV_REGISTRY' is not set, cannot proceed with push." >&2
-      exit 1
-    fi
-
+  up)
     shift
-    TAG="${1:-latest}"
-    docker image push "$IMAGE_NAME:$TAG"
+    _up "$@"
+    ;;
+
+  down)
+    shift
+    _compose down "$@"
+    ;;
+
+  compose)
+    shift
+    _compose "$@"
     ;;
 
   *)
     echo "docker-env: '$COMMAND' is not a docker-env command." >&2
-    echo "See '$0 --help'" >&2
+    echo "See '$PROJECT_DOCKER_DIRECTORY/env.sh --help'" >&2
     exit 1
     ;;
 esac
