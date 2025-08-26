@@ -30,4 +30,4 @@ jobs:
         run: ./docker/env.sh exec -- ./scripts/lint.sh
 
       - name: Wind down docker-env
-        run: ./docker/env.sh down
+        run: ./docker/env.sh compose down
