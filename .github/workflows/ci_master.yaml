@@ -12,6 +12,7 @@ permissions:
 env:
   DOCKER_ENV_REGISTRY: ${{ vars.DOCKER_ENV_REGISTRY }}
   DOCKER_ENV_BUILD_PLATFORMS: linux/arm64,linux/amd64
+  DOCKER_ENV_BUILD_TAGS: ${{ github.sha }}
 
 jobs:
   cache_dev_image:
@@ -33,11 +34,5 @@ jobs:
       - name: Clone project
         uses: actions/checkout@v4
 
-      - name: Build dev env images
-        run: ./docker/env.sh build
-
-      - name: Tag dev env images with commit
-        run: ./docker/env.sh tag ${{ github.sha }}
-
-      - name: Push tagged dev env images
-        run: ./docker/env.sh push
+      - name: Build, tag and push dev env images
+        run: ./docker/env.sh compose build --push

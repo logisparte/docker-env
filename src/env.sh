@@ -28,39 +28,31 @@ USER_HOST_SUDOER_FILE="$USER_HOST_DIRECTORY/sudoer"
 USER_COMPOSE_FILE="$USER_DIRECTORY/compose.yaml"
 
 # Load project .env, if any
-PROJECT_ENV_FILE="${DOCKER_ENV_PROJECT_ENV_FILE:-"$PWD/.env"}"
-if [ -f "$PROJECT_ENV_FILE" ]; then
+if [ -f "$PWD/.env" ]; then
   set -a
-  . "$PROJECT_ENV_FILE"
+  . "$PWD/.env"
   set +a
 fi
 
 PROJECT_NAME="${DOCKER_ENV_PROJECT_NAME:-"$(basename "$PWD")"}"
-PROJECT_DOCKER_DIRECTORY="${DOCKER_ENV_PROJECT_DOCKER_DIRECTORY:-"$PWD/docker"}"
-PROJECT_COMPOSE_FILE="${DOCKER_ENV_PROJECT_COMPOSE_FILE:-"$PROJECT_DOCKER_DIRECTORY/compose.yaml"}"
+PROJECT_COMPOSE_FILE="${DOCKER_ENV_PROJECT_COMPOSE_FILE:-"$PWD/docker/compose.yaml"}"
 PROJECT_CACHE_DIRECTORY="${DOCKER_ENV_PROJECT_CACHE_DIRECTORY:-$PWD/.cache/docker-env}"
 PROJECT_BASE_COMPOSE_FILE="$PROJECT_CACHE_DIRECTORY/base.compose.yaml"
 PROJECT_DEFAULT_SERVICE="${DOCKER_ENV_PROJECT_DEFAULT_SERVICE:-"dev"}"
-BASE_TAG="${DOCKER_ENV_TAG:-latest}"
+BASE_TAG="${DOCKER_ENV_BASE_TAG:-latest}"
+BUILD_TAGS="${DOCKER_ENV_BUILD_TAGS:-}"
 BUILD_PLATFORMS="${DOCKER_ENV_BUILD_PLATFORMS:-}"
 
 _help() {
   {
     echo
-    echo "Usage: $PROJECT_DOCKER_DIRECTORY/env.sh COMMAND [OPTIONS] [ARGS...]"
+    echo "Usage: ./docker/env.sh COMMAND [OPTIONS] [ARGS...]"
     echo
     echo "Encapsulate your project's dev environment inside one or more Docker containers using docker compose"
     echo
     echo "Commands:"
     echo "  shell [SERVICE]|Open an interactive shell in a dev env container"
     echo "  exec [SERVICE] -- COMMAND|Execute a command in a dev env container"
-    echo "  up [OPTIONS]|Build/pull images, create and start dev containers"
-    echo "  down [OPTIONS]|Stop and remove dev containers"
-    echo "  build [OPTIONS]|Build dev env images"
-    echo "  pull [OPTIONS]|Pull dev images"
-    echo "  push [OPTIONS]|Push dev images"
-    echo "  tag TARGET_TAG|Tag dev env images"
-    echo "  init|Init dev env without building or pulling images"
     echo "  compose [ARGUMENTS...]|Directly call 'docker compose' with project settings"
     echo
     echo \
@@ -68,8 +60,11 @@ _help() {
   } | awk -F "|" '{printf "%-40s %s\n", $1, $2}'
 }
 
-# Prepare host files to map host user into dev env containers
 _init_user() {
+  #
+  # Prepare host files to map host user into dev env containers
+  #
+
   mkdir -p "$USER_HOST_DIRECTORY"
 
   HOST_USER="$(id -un)"
@@ -89,8 +84,8 @@ _init_user() {
 
   # /etc/sudoers.d/$HOST_USER file
   if ! sudo -n true 2> /dev/null; then
-    echo "docker-env: This script will generate a 'sudoers.d' file to be mounted in the" \
-      "development container. As this file needs to be owned by the root user, your password" \
+    echo "docker-env: This script will generate a 'sudoers.d' file to be mounted in" \
+      "development containers. As this file needs to be owned by the root user, your password" \
       "will be required."
   fi
 
@@ -107,102 +102,115 @@ _init_user() {
   fi
 
   # docker compose env file
-  cat > "$USER_HOST_COMPOSE_ENV_FILE" << EOF
-HOST_USER=$HOST_USER
-HOST_UID=$HOST_UID
-HOST_GID=$HOST_GID
-HOST_SSH_AUTH_SOCK=$HOST_SSH_AUTH_SOCK
-EOF
+  {
+    echo "HOST_USER=$HOST_USER"
+    echo "HOST_UID=$HOST_UID"
+    echo "HOST_GID=$HOST_GID"
+    echo "HOST_SSH_AUTH_SOCK=$HOST_SSH_AUTH_SOCK"
+  } > "$USER_HOST_COMPOSE_ENV_FILE"
 
   # User compose file
   if [ ! -f "$USER_COMPOSE_FILE" ]; then
-    cat > "$USER_COMPOSE_FILE" << EOF
-services:
-  user:
-    # Add your customizations here, example:
-    # volumes:
-    #   - ./custom_volume:/custom_volume
-EOF
+    {
+      echo "services:"
+      echo "  user:"
+      echo "    # Add your customizations here, example:"
+      echo "    # volumes:"
+      echo "    #   - ./custom_volume:/custom_volume"
+    } > "$USER_COMPOSE_FILE"
   fi
 }
 
 _generate_project_base() {
+  #
+  # Generate base compose.yaml file for local project, based on user host files and
+  # customizations
+  #
+
   rm -rf "$PROJECT_CACHE_DIRECTORY"
   mkdir -p "$PROJECT_CACHE_DIRECTORY"
-  touch "$PROJECT_BASE_COMPOSE_FILE"
-
-  if [ -n "$BUILD_PLATFORMS" ]; then
-    echo "x-platforms: &platforms" >> "$PROJECT_BASE_COMPOSE_FILE"
-    echo "  platforms:" >> "$PROJECT_BASE_COMPOSE_FILE"
-    ORIGINAL_IFS="$IFS"
-    IFS=','
-    for PLATFORM in $BUILD_PLATFORMS; do
-      echo "    - $PLATFORM" >> "$PROJECT_BASE_COMPOSE_FILE"
-    done
-    IFS="$ORIGINAL_IFS"
-  fi
-
-  cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
-
-services:
-  docker-env:
-    extends:
-      service: user
-      file: $USER_COMPOSE_FILE
-    env_file:
-      - path: $PROJECT_ENV_FILE
-        required: false
-    environment:
-      DOCKER_ENV: true
-      SSH_AUTH_SOCK: \$HOST_SSH_AUTH_SOCK
-      TERM:
-      CI:
-    user: \$HOST_UID:\$HOST_GID
-    volumes:
-      - \${HOST_SSH_AUTH_SOCK:-/dev/null}:\${HOST_SSH_AUTH_SOCK:-/dev/null}
-      - $HOME/.config/docker-env/host/group:/etc/group:ro
-      - $HOME/.config/docker-env/host/passwd:/etc/passwd:ro
-      - $HOME/.config/docker-env/host/sudoer:/etc/sudoers.d/\$HOST_USER:ro
-      - \$PWD:\$PWD
-    working_dir: \$PWD
-    entrypoint: ["$PROJECT_DOCKER_DIRECTORY/env.sh", "_entrypoint"]
-EOF
-
-  for DOCKERFILE in "$PROJECT_DOCKER_DIRECTORY"/*Dockerfile; do
-    if [ ! -f "$DOCKERFILE" ]; then
-      continue
-    fi
-
-    FILE_NAME="$(basename "$DOCKERFILE")"
-    if [ "$FILE_NAME" = "Dockerfile" ]; then
-      _SERVICE=
-    else
-      _SERVICE="$(echo "$FILE_NAME" | cut -d "." -f 1)"
-    fi
-
-    IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${_SERVICE:+-${_SERVICE}}-env"
-    cat >> "$PROJECT_BASE_COMPOSE_FILE" << EOF
-
-  ${_SERVICE:-$PROJECT_DEFAULT_SERVICE}:
-    extends:
-      service: docker-env
-    image: $IMAGE:$BASE_TAG
-    build:
-      dockerfile: $DOCKERFILE
-      pull: true
-      cache_from:
-        - $IMAGE:$BASE_TAG
-      cache_to:
-        - type=inline
-EOF
+  {
     if [ -n "$BUILD_PLATFORMS" ]; then
-      echo "      <<: *platforms" >> "$PROJECT_BASE_COMPOSE_FILE"
+      echo "x-platforms: &platforms"
+      echo "  platforms:"
+      (
+        IFS=','
+        for PLATFORM in $BUILD_PLATFORMS; do echo "    - $PLATFORM"; done
+      )
+      echo
     fi
-  done
+
+    echo "services:"
+    echo "  docker-env:"
+    echo "    extends:"
+    echo "      service: user"
+    echo "      file: \$HOME/.config/docker-env/compose.yaml"
+    echo "    env_file:"
+    echo "      - path: \$PWD/.env"
+    echo "        required: false"
+    echo "    environment:"
+    echo "      DOCKER_ENV: true"
+    echo "      SSH_AUTH_SOCK: \$HOST_SSH_AUTH_SOCK"
+    echo "      TERM:"
+    echo "      CI:"
+    echo "    user: \$HOST_UID:\$HOST_GID"
+    echo "    volumes:"
+    echo "      - \${HOST_SSH_AUTH_SOCK:-/dev/null}:\${HOST_SSH_AUTH_SOCK:-/dev/null}"
+    echo "      - \$HOME/.config/docker-env/host/group:/etc/group:ro"
+    echo "      - \$HOME/.config/docker-env/host/passwd:/etc/passwd:ro"
+    echo "      - \$HOME/.config/docker-env/host/sudoer:/etc/sudoers.d/\$HOST_USER:ro"
+    echo "      - \$PWD:\$PWD"
+    echo "    working_dir: \$PWD"
+    echo "    entrypoint: [\"\$PWD/docker/env.sh\", \"_entrypoint\"]"
+    echo
+
+    for DOCKERFILE in "$PWD"/docker/*Dockerfile; do
+      if [ ! -f "$DOCKERFILE" ]; then
+        continue
+      fi
+
+      FILE_NAME="$(basename "$DOCKERFILE")"
+      if [ "$FILE_NAME" = "Dockerfile" ]; then
+        _SERVICE=
+      else
+        _SERVICE="$(echo "$FILE_NAME" | cut -d "." -f 1)"
+      fi
+
+      IMAGE="${DOCKER_ENV_REGISTRY:+$DOCKER_ENV_REGISTRY/}$PROJECT_NAME${_SERVICE:+-${_SERVICE}}-env"
+      echo "  ${_SERVICE:-$PROJECT_DEFAULT_SERVICE}:"
+      echo "    extends:"
+      echo "      service: docker-env"
+      echo "    image: $IMAGE:$BASE_TAG"
+      echo "    build:"
+      echo "      dockerfile: \$PWD/docker/$FILE_NAME"
+      echo "      pull: true"
+      echo "      cache_from:"
+      echo "        - $IMAGE:$BASE_TAG"
+      echo "      cache_to:"
+      echo "        - type=inline"
+
+      if [ -n "$BUILD_PLATFORMS" ]; then
+        echo "      <<: *platforms"
+      fi
+
+      if [ -n "$BUILD_TAGS" ]; then
+        echo "      tags:"
+        (
+          IFS=','
+          for TAG in $BUILD_TAGS; do echo "        - $IMAGE:$TAG"; done
+        )
+      fi
+
+      echo
+    done
+  } > "$PROJECT_BASE_COMPOSE_FILE"
 }
 
-# Container entrypoint (used inside dev env containers)
 _entrypoint() {
+  #
+  # Container entrypoint (used inside dev env containers)
+  #
+
   USERNAME="$(id -un)"
 
   # Rationalize ownership of project's ancestor directories
@@ -227,7 +235,11 @@ _entrypoint() {
   fi
 }
 
-# To use docker compose with project's compose file and docker-env configurations
+_init() {
+  [ -d "$USER_DIRECTORY" ] || _init_user
+  _generate_project_base
+}
+
 _compose() {
   DOCKER_ENV_PROJECT_BASE_COMPOSE_FILE="$PROJECT_BASE_COMPOSE_FILE" \
     docker compose \
@@ -237,24 +249,8 @@ _compose() {
     "$@"
 }
 
-_is_up() {
-  _compose ls --quiet | grep "$PROJECT_NAME" > /dev/null 2>&1
-}
-
-_up() {
-  _init
-  _compose up --wait "$@"
-}
-
-_init() {
-  [ -d "$USER_DIRECTORY" ] || _init_user
-  _generate_project_base
-}
-
-_list_dev_images() {
-  docker image ls --format "{{.Repository}}:{{.Tag}}" \
-    | grep "-env:$BASE_TAG" \
-    | sort -u
+_ensure_up() {
+  _compose ls --quiet | grep "$PROJECT_NAME" > /dev/null 2>&1 || _compose up --wait
 }
 
 _tag() {
@@ -265,32 +261,27 @@ _tag() {
     exit 1
   fi
 
-  for DEV_IMAGE in $(_list_dev_images); do
-    DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
-    docker tag "$DEV_IMAGE" "$DEV_IMAGE_REPOSITORY:$TARGET_TAG"
-  done
-}
+  DEV_IMAGES="$({
+    docker image ls --format "{{.Repository}}:{{.Tag}}" \
+      | grep "-env:$BASE_TAG" \
+      | sort -u
+  })"
 
-_push() {
-  for DEV_IMAGE in $(_list_dev_images); do
+  for DEV_IMAGE in $DEV_IMAGES; do
     DEV_IMAGE_REPOSITORY=$(echo "$DEV_IMAGE" | awk -F: '{print $1}')
-    docker push --all-tags "$DEV_IMAGE_REPOSITORY"
+    docker image tag "$DEV_IMAGE" "$DEV_IMAGE_REPOSITORY:$TARGET_TAG"
   done
 }
 
 COMMAND="${1:---help}"
 if [ "$DOCKER_ENV" ]; then
-  case "$COMMAND" in
-    _entrypoint)
-      shift
-      "$COMMAND" "$@"
-      ;;
+  if [ "$COMMAND" = "_entrypoint" ]; then
+    _entrypoint "$@"
 
-    *)
-      echo "docker-env: Already inside a dev env container." >&2
-      exit 1
-      ;;
-  esac
+  else
+    echo "docker-env: Already inside a dev env container." >&2
+    exit 1
+  fi
 else
   case "$COMMAND" in
     -h | --help)
@@ -300,7 +291,9 @@ else
     shell)
       shift
       MAYBE_SERVICE="$1"
-      _is_up || _up
+
+      _init
+      _ensure_up
       _compose exec \
         --env DOCKER_ENV_NAME="$PROJECT_NAME${MAYBE_SERVICE:+-$MAYBE_SERVICE}-env" \
         "${MAYBE_SERVICE:-$PROJECT_DEFAULT_SERVICE}" \
@@ -309,79 +302,44 @@ else
 
     exec)
       shift
-      case "$1" in
-        "")
-          echo "docker-env: Missing exec arguments" >&2
-          echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
-          exit 1
-          ;;
-
-        --)
+      case "$*" in
+        "-- "*)
           SERVICE="$PROJECT_DEFAULT_SERVICE"
           shift
           ;;
 
-        *)
+        *" -- "*)
           SERVICE="$1"
-          shift
-          if [ "$1" != "--" ]; then
-            echo "docker-env: Missing service/command separator '--'" >&2
-            echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
-            exit 1
-          fi
-          shift
+          shift 2
+          ;;
+
+        *)
+          echo "docker-env: Missing exec arguments" >&2
+          echo "  Usage: ./docker/env.sh exec [SERVICE] -- COMMAND"
+          exit 1
           ;;
       esac
 
-      _is_up || _up
+      _init
+      _ensure_up
       _compose exec "$SERVICE" "$@"
-      ;;
-
-    up)
-      shift
-      _up "$@"
-      ;;
-
-    down)
-      shift
-      _compose down "$@"
-      ;;
-
-    build)
-      shift
-      _init
-      _compose build "$@"
-      ;;
-
-    pull)
-      shift
-      _init
-      _compose pull "$@"
-      ;;
-
-    push)
-      shift
-      _push "$@"
       ;;
 
     tag)
       shift
+      _init
       _tag "$@"
-      ;;
-
-    init)
-      shift
-      _init "$@"
       ;;
 
     compose)
       shift
+      _init
       _compose "$@"
       ;;
 
     *)
       echo "docker-env: '$COMMAND' is not a docker-env command." >&2
-      echo "See '$PROJECT_DOCKER_DIRECTORY/env.sh --help'" >&2
+      echo "See './docker/env.sh --help'" >&2
       exit 1
       ;;
   esac

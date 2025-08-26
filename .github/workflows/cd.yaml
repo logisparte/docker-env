@@ -11,7 +11,7 @@ permissions:
 
 env:
   DOCKER_ENV_REGISTRY: ${{ vars.DOCKER_ENV_REGISTRY }}
-  DOCKER_ENV_TAG: ${{ github.sha }}
+  DOCKER_ENV_BASE_TAG: ${{ github.sha }}
 
 jobs:
   tag_dev_image:
@@ -31,7 +31,7 @@ jobs:
         run: |
           RETRIES=3
           while [ $RETRIES -gt 0 ]; do
-            if ./docker/env.sh pull; then
+            if ./docker/env.sh compose pull; then
               exit 0
             else
               echo "Retrying in 1 minute"
@@ -41,8 +41,7 @@ jobs:
           done
           exit 1
 
-      - name: Tag dev env images with version
-        run: ./docker/env.sh tag ${{ github.ref_name }}
-
-      - name: Push tagged dev env images
-        run: ./docker/env.sh push
+      - name: Tag and push dev env images
+        run: |
+          ./docker/env.sh tag ${{ github.ref_name }}
+          DOCKER_ENV_BASE_TAG=${{ github.ref_name }} ./docker/env.sh compose push
