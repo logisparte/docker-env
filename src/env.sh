@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# docker-env 0.4.0
+# docker-env 0.5.0
 #
 # Copyright 2025 logisparte inc.
 #
