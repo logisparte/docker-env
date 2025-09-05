@@ -53,6 +53,7 @@ _help() {
     echo "Commands:"
     echo "  shell [SERVICE]|Open an interactive shell in a dev env container"
     echo "  exec [SERVICE] -- COMMAND|Execute a command in a dev env container"
+    echo "  tag TARGET_TAG|Tag dev env images"
     echo "  compose [ARGUMENTS...]|Directly call 'docker compose' with project settings"
     echo
     echo \
@@ -276,6 +277,7 @@ _tag() {
 COMMAND="${1:---help}"
 if [ "$DOCKER_ENV" ]; then
   if [ "$COMMAND" = "_entrypoint" ]; then
+    shift
     _entrypoint "$@"
 
   else
@@ -301,6 +303,7 @@ else
       _ensure_up
       _compose exec \
         --env DOCKER_ENV_NAME="$DOCKER_ENV_NAME" \
+        --env DOCKER_ENV_SERVICE="$SERVICE" \
         "$SERVICE" \
         "${SHELL:-/bin/sh}" --login
       ;;
@@ -335,6 +338,7 @@ else
       _ensure_up
       _compose exec \
         --env DOCKER_ENV_NAME="$DOCKER_ENV_NAME" \
+        --env DOCKER_ENV_SERVICE="$SERVICE" \
         "$SERVICE" \
         "$@"
       ;;

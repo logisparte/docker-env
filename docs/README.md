@@ -50,16 +50,18 @@ You can customize the following environment variables:
 | `DOCKER_ENV_PROJECT_COMPOSE_FILE`    | `./docker/compose.yaml` | The dev env compose file, where services are defined             |
 | `DOCKER_ENV_PROJECT_CACHE_DIRECTORY` | `./.cache/docker-env`   | Where docker-env will store its generated files for your project |
 | `DOCKER_ENV_PROJECT_DEFAULT_SERVICE` | dev                     | Default dev env service to use when unspecified                  |
-| `DOCKER_ENV_BUILD_PLATFORMS`         | -                       | Target platforms when building images                            |
 | `DOCKER_ENV_REGISTRY`                | -                       | Registry where built images will be pulled/pushed from/to        |
 | `DOCKER_ENV_BASE_TAG`                | latest                  | Image tag to build/pull from registry                            |
+| `DOCKER_ENV_BUILD_TAGS`              | -                       | Extra image tags to add when building images                     |
+| `DOCKER_ENV_BUILD_PLATFORMS`         | -                       | Target platforms when building images                            |
 
 These variables are readonly:
 
 | var                                    | value                                                   | description                                                                                                            |
 | -------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `DOCKER_ENV`                           | true                                                    | Only available inside a dev env container                                                                              |
-| `DOCKER_ENV_NAME`                      | Name of the current service                             | Only available when running an interactive shell inside a dev env container                                            |
+| `DOCKER_ENV_NAME`                      | Name of the current environment                         | Only available inside a dev env container                                                                              |
+| `DOCKER_ENV_SERVICE`                   | Name of the current service                             | Only available inside a dev env container                                                                              |
 | `DOCKER_ENV_PROJECT_BASE_COMPOSE_FILE` | `$DOCKER_ENV_PROJECT_CACHE_DIRECTORY/base.compose.yaml` | Generated base compose file that **must** be extended by your dev-env service(s) in `$DOCKER_ENV_PROJECT_COMPOSE_FILE` |
 
 <!-- markdownlint-enable MD013 -->
