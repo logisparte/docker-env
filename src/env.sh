@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# docker-env 0.5.0
+# docker-env 0.5.1
 #
 # Copyright 2025 logisparte inc.
 #
@@ -290,13 +290,18 @@ else
 
     shell)
       shift
-      MAYBE_SERVICE="$1"
+      SERVICE="${1:-$PROJECT_DEFAULT_SERVICE}"
+      if [ "$SERVICE" = "dev" ]; then
+        DOCKER_ENV_NAME="$PROJECT_NAME-env"
+      else
+        DOCKER_ENV_NAME="$PROJECT_NAME-$SERVICE-env"
+      fi
 
       _init
       _ensure_up
       _compose exec \
-        --env DOCKER_ENV_NAME="$PROJECT_NAME${MAYBE_SERVICE:+-$MAYBE_SERVICE}-env" \
-        "${MAYBE_SERVICE:-$PROJECT_DEFAULT_SERVICE}" \
+        --env DOCKER_ENV_NAME="$DOCKER_ENV_NAME" \
+        "$SERVICE" \
         "${SHELL:-/bin/sh}" --login
       ;;
 
@@ -320,9 +325,18 @@ else
           ;;
       esac
 
+      if [ "$SERVICE" = "dev" ]; then
+        DOCKER_ENV_NAME="$PROJECT_NAME-env"
+      else
+        DOCKER_ENV_NAME="$PROJECT_NAME-$SERVICE-env"
+      fi
+
       _init
       _ensure_up
-      _compose exec "$SERVICE" "$@"
+      _compose exec \
+        --env DOCKER_ENV_NAME="$DOCKER_ENV_NAME" \
+        "$SERVICE" \
+        "$@"
       ;;
 
     tag)
